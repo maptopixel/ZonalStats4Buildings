@@ -18,48 +18,42 @@ def main(args):
     dsmImg = args.dsmImg
     dtmImg = args.dtmImg
    
+   
+    #initialise
     USE_RIDGELINES = False
     USE_DTM = False
     USE_DSM = False
-    USE_SLOPE = True 
+    USE_SLOPE = False
          
+    if footprintsRidgeLines != '': USE_RIDGELINES = True
+    #if footprintsEdges != '': USE_EDGES = True
+    if dsmSlopeImg != '': USE_SLOPE = True
+    if dsmImg != '': USE_DSM = True
+    if dtmImg != '': USE_DTM = True 
+        
     
-    # Import GDAL, NumPy, and matplotlib
+    
     import numpy as np
     import matplotlib.pyplot as plt
-    
-    
+        
     from rasterstats import zonal_stats
     import geopandas as gpd
     import pandas as pd
-    from geopandas import GeoSeries, GeoDataFrame
-    
-    import rasterio
-        
+    from geopandas import GeoSeries, GeoDataFrame    
+    import rasterio        
     import logging
+    
     logging.basicConfig(level=logging.DEBUG) # for Fiona
     
-
     
     print 'Setting files and vars...'
-
-
     footprintsGDF = gpd.GeoDataFrame.from_file(footprints)
     footprintsGDF.plot()
     footprintsGDF.rename(index=str, columns={"fid": "fid_1"})
     footprintsGDF = footprintsGDF.rename(columns={"fid": "fid_1"})
     footprintsGDF.columns
     
-    if footprintsRidgeLines != '':
-        print 'Reading ridgelines...'
-        footprintMedialAxisLinesGDF = gpd.GeoDataFrame.from_file(footprintMedialAxisLines)
-        footprintMedialAxisLinesGDF.plot()
-    
-    if footprintsRidgeLines != '':        
-        #edgesGDF = gpd.GeoDataFrame.from_file(footprintsEdges)
-        edgesGDF  = footprintsGDF # dont use inward buffered polys
-        
-    
+
     metrics = "min max mean median std range percentile_90".split()
     metricsSelector = list(metrics) #create new copy of list!
     metricsSelector.insert(0, "fid_1")
@@ -77,7 +71,7 @@ def main(args):
         dsmArray
         dsmArray[dsmArray==-9999]=np.nan
         
-        allDSMShapeStats = zonal_stats(edgesGDF, dsmArray, transform=transform, nodata =-9999,geojson_out=True,stats=metrics)
+        allDSMShapeStats = zonal_stats(footprintsGDF, dsmArray, transform=transform, nodata =-9999,geojson_out=True,stats=metrics)
         
         allDSMShapeStatsDF = GeoDataFrame.from_features(allDSMShapeStats )
         #allDSMShapeStatsDF = pd.DataFrame(allDSMShapeStats)
@@ -97,9 +91,9 @@ def main(args):
         dtmArray
         dtmArray[dtmArray==-9999]=np.nan
         
-        allDTMShapeStats = zonal_stats(edgesGDF , dtmArray,transform=transform, nodata =-9999,geojson_out=True,stats=metrics)
+        allDTMShapeStats = zonal_stats(footprintsGDF, dtmArray,transform=transform, nodata =-9999,geojson_out=True,stats=metrics)
         allDTMShapeStatsDF = GeoDataFrame.from_features(allDTMShapeStats )
-        allDTMShapeStatsDF=allDTMShapeStatsDF[metricsSelector]
+        allDTMShapeStatsDF = allDTMShapeStatsDF[metricsSelector]
         allDTMShapeStatsDF = allDTMShapeStatsDF.add_prefix('DTM_')
         allDTMShapeStatsDF.columns
     
@@ -125,7 +119,7 @@ def main(args):
         allSlopeShapeStatsDF.columns
     
            
-    # CENTRE LINES
+    # RIDGELINES
     if USE_RIDGELINES == True:
         geodfCentres = gpd.GeoDataFrame.from_file(footprintMedialAxisLines)
         geodfCentres.plot()
@@ -139,8 +133,10 @@ def main(args):
     
     # join dsm and dtm
     footprintsGDFWithVals = footprintsGDF
+    if USE_DTM == True:
+        footprintsGDFWithVals = footprintsGDFWithVals.merge(allDTMShapeStatsDF, left_on='fid_1', right_on='DTM_fid_1', how='inner')
     if USE_DSM == True:
-        footprintsGDFWithVals = footprintsGDFWithVals.merge(allDTMShapeStatsDF, left_on='DSM_fid_1', right_on='DTM_fid_1', how='inner')
+        footprintsGDFWithVals = footprintsGDFWithVals.merge(allDSMShapeStatsDF, left_on='fid_1', right_on='DSM_fid_1', how='inner')
     if USE_SLOPE == True:
         footprintsGDFWithVals = footprintsGDFWithVals.merge(allSlopeShapeStatsDF, left_on='fid_1', right_on='SLOP_fid_1', how='inner')
         
@@ -187,17 +183,17 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--footprints', default='', type=str,
+    parser.add_argument('--footprints', default='', type=str, required=True,
         help='A building footprints polygon file, no multi-polygons and there is a unique ID per poly')
-    parser.add_argument('--footprintsEdges', default='', type=str,
+    parser.add_argument('--footprintsEdges', default='', type=str, required=False,
         help='A file of polygons corresponding to the building edges e.g result of an inward buffer')
-    parser.add_argument('--footprintsRidgeLines', default='', type=str,
+    parser.add_argument('--footprintsRidgeLines', default='', type=str,required=False,
         help='A file of lines corresponding to the roof ridgeline e.g result of medial axis transformation')          
-    parser.add_argument('--dsmImg', default='', type=str,
+    parser.add_argument('--dsmImg', default='', type=str, required=True,
         help='A raster DSM')         
-    parser.add_argument('--dtmImg', default='', type=str,
+    parser.add_argument('--dtmImg', default='', type=str, required=True,
         help='A raster DTM')      
-    parser.add_argument('--dsmSlopeImg', default='', type=str,
+    parser.add_argument('--dsmSlopeImg', default='', type=str, required=False,
         help='A raster of the slope values')    
     
     args = parser.parse_args()
