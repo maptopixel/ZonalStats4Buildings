@@ -165,7 +165,6 @@ def main(args):
         
     
     new_geodf= new_geodfRev
-
     
     ## Hack for defining the CRS in geopandas
     new_geodf.__class__ = gpd.GeoDataFrame
