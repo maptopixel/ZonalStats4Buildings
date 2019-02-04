@@ -49,8 +49,8 @@ def main(args):
     print 'Setting files and vars...'
     footprintsGDF = gpd.GeoDataFrame.from_file(footprints)
     footprintsGDF.plot()
-    footprintsGDF.rename(index=str, columns={"fid": "fid_1"})
-    footprintsGDF = footprintsGDF.rename(columns={"fid": "fid_1"})
+    footprintsGDF.rename(index=str, columns={"osm_id": "fid_1"})
+    footprintsGDF = footprintsGDF.rename(columns={"osm_id": "fid_1"})
     footprintsGDF.columns
     
 
